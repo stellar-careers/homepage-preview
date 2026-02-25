@@ -1,0 +1,32 @@
+name: Notify Slack on Preview Deploy
+
+on:
+  page_build:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    if: github.event.build.status == 'built'
+    steps:
+      - name: Extract PR number from commit message
+        id: extract
+        run: |
+          COMMIT_MSG="${{ github.event.build.commit }}"
+          # Fetch the commit message from the API
+          MSG=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/git/commits/${COMMIT_MSG}" \
+            | jq -r '.message')
+          # Extract PR number from "Deploy preview for PR #123"
+          PR_NUM=$(echo "$MSG" | grep -oP '(?<=PR #)\d+' || echo "")
+          echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
+          echo "message=$MSG" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Slack
+        if: steps.extract.outputs.pr_number != ''
+        uses: slackapi/slack-github-action@v2
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_USER_OAUTH_TOKEN }}
+          payload: |
+            channel: "C09KJ7UJ5HQ"
+            text: "PR プレビューデプロイ完了 :eyes:\nPR: #${{ steps.extract.outputs.pr_number }}\nhttps://stellar-careers.github.io/homepage-preview/${{ steps.extract.outputs.pr_number }}/"
