@@ -11,15 +11,14 @@ jobs:
       - name: Extract PR number from commit message
         id: extract
         run: |
-          COMMIT_MSG="${{ github.event.build.commit }}"
-          # Fetch the commit message from the API
+          COMMIT_SHA="${{ github.event.build.commit }}"
+          # Fetch the first line of the commit message
           MSG=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/git/commits/${COMMIT_MSG}" \
-            | jq -r '.message')
+            "https://api.github.com/repos/${{ github.repository }}/git/commits/${COMMIT_SHA}" \
+            | jq -r '.message' | head -1)
           # Extract PR number from "Deploy preview for PR #123"
-          PR_NUM=$(echo "$MSG" | grep -oP '(?<=PR #)\d+' || echo "")
-          echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
-          echo "message=$MSG" >> "$GITHUB_OUTPUT"
+          PR_NUM=$(echo "$MSG" | grep -oP '(?<=PR #)\d+' || true)
+          echo "pr_number=${PR_NUM:-}" >> "$GITHUB_OUTPUT"
 
       - name: Notify Slack
         if: steps.extract.outputs.pr_number != ''
