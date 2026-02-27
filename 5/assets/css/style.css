@@ -18571,7 +18571,6 @@ a.text {
 .coach-announce-banner-sub {
   font-weight: 400;
   font-size: 0.8rem;
-  opacity: 0.85;
 }
 
 @media (min-width: 600px) {
@@ -19035,6 +19034,18 @@ a.text {
   color: var(--coach-gray-300);
   font-size: 1rem;
   margin-bottom: 2rem;
+}
+
+.coach-signup-note {
+  margin-top: 1rem;
+  font-size: 0.8125rem;
+  color: var(--coach-gray-600);
+  max-width: 36rem;
+  text-align: center;
+}
+
+.coach-cta .coach-signup-note {
+  color: var(--coach-gray-300);
 }
 
 /* --- Coach Tabs --- */
