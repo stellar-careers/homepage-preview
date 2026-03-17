@@ -17,7 +17,7 @@ jobs:
             "https://api.github.com/repos/${{ github.repository }}/git/commits/${COMMIT_SHA}" \
             | jq -r '.message' | head -1)
           # Extract PR number and commit message from "Deploy preview for PR #123: message"
-          PR_NUM=$(echo "$MSG" | grep -oP '(?<=PR #)\d+' || true)
+          PR_NUM=$(echo "$MSG" | grep -oP '(?<=^Deploy preview for PR #)\d+' || true)
           COMMIT_MSG=$(echo "$MSG" | sed -n 's/.*PR #[0-9]*: //p')
           echo "pr_number=${PR_NUM:-}" >> "$GITHUB_OUTPUT"
           echo "commit_msg=${COMMIT_MSG:-}" >> "$GITHUB_OUTPUT"
