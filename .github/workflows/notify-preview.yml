@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.build.status == 'built'
     steps:
-      - name: Extract PR number from commit message
+      - name: Extract PR number and commit message
         id: extract
         run: |
           COMMIT_SHA="${{ github.event.build.commit }}"
@@ -16,9 +16,11 @@ jobs:
           MSG=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/git/commits/${COMMIT_SHA}" \
             | jq -r '.message' | head -1)
-          # Extract PR number from "Deploy preview for PR #123"
+          # Extract PR number and commit message from "Deploy preview for PR #123: message"
           PR_NUM=$(echo "$MSG" | grep -oP '(?<=PR #)\d+' || true)
+          COMMIT_MSG=$(echo "$MSG" | sed -n 's/.*PR #[0-9]*: //p')
           echo "pr_number=${PR_NUM:-}" >> "$GITHUB_OUTPUT"
+          echo "commit_msg=${COMMIT_MSG:-}" >> "$GITHUB_OUTPUT"
 
       - name: Notify Slack
         if: steps.extract.outputs.pr_number != ''
@@ -28,4 +30,6 @@ jobs:
           token: ${{ secrets.SLACK_BOT_USER_OAUTH_TOKEN }}
           payload: |
             channel: "C09KJ7UJ5HQ"
-            text: "PR プレビューデプロイ完了 :eyes:\nPR: #${{ steps.extract.outputs.pr_number }}\nhttps://stellar-careers.github.io/homepage-preview/${{ steps.extract.outputs.pr_number }}/"
+            text: "プレビューデプロイ完了（PR #${{ steps.extract.outputs.pr_number }}）確認してほしいポイントは「${{ steps.extract.outputs.commit_msg }}」です！ 確認は<https://stellar-careers.github.io/homepage-preview/${{ steps.extract.outputs.pr_number }}/|こちら> ;)"
+            unfurl_links: false
+            unfurl_media: false
