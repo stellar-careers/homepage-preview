@@ -1,5 +1,8 @@
 name: Notify Slack on Preview Deploy
 
+# プレビューデプロイ完了時に Slack 通知する。
+# ただし通知するのは Copilot（Bot）が作成した記事系 PR のみ。
+# エンジニア（人間）が出した PR のプレビューは通知しない。
 on:
   page_build:
 
@@ -8,28 +11,63 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.build.status == 'built'
     steps:
-      - name: Extract PR number and commit message
-        id: extract
-        run: |
-          COMMIT_SHA="${{ github.event.build.commit }}"
-          # Fetch the first line of the commit message
-          MSG=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/git/commits/${COMMIT_SHA}" \
-            | jq -r '.message' | head -1)
-          # Extract PR number and commit message from "Deploy preview for PR #123: message"
-          PR_NUM=$(echo "$MSG" | grep -oP '(?<=^Deploy preview for PR #)\d+' || true)
-          COMMIT_MSG=$(echo "$MSG" | sed -n 's/.*PR #[0-9]*: //p')
-          echo "pr_number=${PR_NUM:-}" >> "$GITHUB_OUTPUT"
-          echo "commit_msg=${COMMIT_MSG:-}" >> "$GITHUB_OUTPUT"
-
-      - name: Notify Slack
-        if: steps.extract.outputs.pr_number != ''
-        uses: slackapi/slack-github-action@v2
+      # 信頼できない PR タイトルを ${{ }} で展開するとペイロードが壊れる/注入される
+      # 恐れがあるため、すべて github-script 内の JS 変数として安全に扱う。
+      - name: Notify Slack for article preview
+        uses: actions/github-script@v7
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_USER_OAUTH_TOKEN }}
         with:
-          method: chat.postMessage
-          token: ${{ secrets.SLACK_BOT_USER_OAUTH_TOKEN }}
-          payload: |
-            channel: "C09KJ7UJ5HQ"
-            text: "プレビューデプロイ完了（PR #${{ steps.extract.outputs.pr_number }}）確認してほしいポイントは「${{ steps.extract.outputs.commit_msg }}」です！ 確認は<https://stellar-careers.github.io/homepage-preview/${{ steps.extract.outputs.pr_number }}/|こちら> ;)"
-            unfurl_links: false
-            unfurl_media: false
+          script: |
+            const SOURCE = { owner: 'stellar-careers', repo: 'stellar-careers.github.io' };
+
+            // 1) ビルド対象コミットのメッセージから PR 番号とタイトルを取り出す。
+            //    コミットは "Deploy preview for PR #N: <title>" の形式（preview.yml が生成）。
+            const sha = context.payload.build.commit;
+            const { data: commit } = await github.rest.git.getCommit({
+              owner: context.repo.owner, repo: context.repo.repo, commit_sha: sha,
+            });
+            const firstLine = (commit.message || '').split('\n')[0];
+            const m = firstLine.match(/^Deploy preview for PR #(\d+): (.*)$/);
+            if (!m) {
+              core.info('プレビューデプロイ用コミットではないため通知をスキップ。');
+              return;
+            }
+            const prNumber = Number(m[1]);
+            const prTitle = m[2];
+
+            // 2) 元リポジトリの PR 作者を確認。Copilot（Bot）が作った記事系 PR のみ通知。
+            const { data: pr } = await github.rest.pulls.get({
+              owner: SOURCE.owner, repo: SOURCE.repo, pull_number: prNumber,
+            });
+            if (pr.user.type !== 'Bot') {
+              core.info(`PR #${prNumber} は ${pr.user.login}（${pr.user.type}）作のため通知をスキップ。`);
+              return;
+            }
+
+            // 3) Slack 通知
+            const previewUrl = `https://stellar-careers.github.io/homepage-preview/${prNumber}/`;
+            const prUrl = `https://github.com/${SOURCE.owner}/${SOURCE.repo}/pull/${prNumber}`;
+            const text =
+              `📄 記事プレビューの準備ができました（PR #${prNumber}）\n` +
+              `タイトル：「${prTitle}」\n` +
+              `① まず表示を確認 → <${previewUrl}|プレビューを開く>\n` +
+              `② 問題なければ PR 画面の「Merge pull request」で公開できます → <${prUrl}|PR を開く>`;
+
+            const res = await fetch('https://slack.com/api/chat.postMessage', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+                'Content-Type': 'application/json; charset=utf-8',
+              },
+              body: JSON.stringify({
+                channel: 'C09KJ7UJ5HQ',
+                text,
+                unfurl_links: false,
+                unfurl_media: false,
+              }),
+            });
+            const data = await res.json();
+            if (!data.ok) {
+              core.setFailed(`Slack API error: ${data.error}`);
+            }
