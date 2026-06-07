@@ -45,14 +45,24 @@ jobs:
               return;
             }
 
-            // 3) Slack 通知
+            // 3) Slack 通知（Block Kit）
+            const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             const previewUrl = `https://stellar-careers.github.io/homepage-preview/${prNumber}/`;
             const prUrl = `https://github.com/${SOURCE.owner}/${SOURCE.repo}/pull/${prNumber}`;
-            const text =
-              `📄 記事プレビューの準備ができました（PR #${prNumber}）\n` +
-              `タイトル：「${prTitle}」\n` +
-              `① まず表示を確認 → <${previewUrl}|プレビューを開く>\n` +
-              `② 問題なければ PR 画面の「Merge pull request」で公開できます → <${prUrl}|PR を開く>`;
+
+            const text = `👀 記事プレビューができました（PR #${prNumber}）：${prTitle}`;
+            const blocks = [
+              { type: 'header', text: { type: 'plain_text', text: '👀 記事プレビューができました', emoji: true } },
+              { type: 'section', text: { type: 'mrkdwn', text: `*${esc(prTitle)}*\nPR #${prNumber}` } },
+              { type: 'section', text: { type: 'mrkdwn', text: 'まずプレビューで表示を確認してください。問題なければ *PR に「承認」とコメント* するだけで、CI 通過後に自動で本番公開されます🚀' } },
+              { type: 'actions', elements: [
+                { type: 'button', text: { type: 'plain_text', text: '👀 プレビューを見る', emoji: true }, url: previewUrl, style: 'primary' },
+                { type: 'button', text: { type: 'plain_text', text: '✅ PRを開いて承認する', emoji: true }, url: prUrl },
+              ]},
+              { type: 'context', elements: [
+                { type: 'mrkdwn', text: '承認権限のある方が PR に「承認」とコメントすると公開されます（GitHub の Approve ボタン操作は不要です）。' },
+              ]},
+            ];
 
             const res = await fetch('https://slack.com/api/chat.postMessage', {
               method: 'POST',
@@ -63,6 +73,7 @@ jobs:
               body: JSON.stringify({
                 channel: 'C09KJ7UJ5HQ',
                 text,
+                blocks,
                 unfurl_links: false,
                 unfurl_media: false,
               }),
