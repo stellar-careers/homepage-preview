@@ -20456,34 +20456,6 @@ a.text {
   line-height: 1.5;
   text-decoration: none;
 }
-/* ケース面接の記事だけ: ステラコーチへの案内（2026-10。E-03） */
-.ia-coach {
-  padding: 20px 24px;
-  border: 1px solid #ddd6fe;
-  border-radius: 8px;
-  background: #ffffff;
-  text-align: center;
-}
-.ia-coach-lead {
-  margin: 0 0 12px;
-  font-size: 14px;
-  line-height: 1.7;
-  color: #222222;
-}
-.ia-coach-link {
-  display: inline-block;
-  padding: 10px 24px;
-  border: 1px solid #6d28d9;
-  border-radius: 6px;
-  color: #5b21b6;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.5;
-  text-decoration: none;
-}
-.ia-coach-link:hover {
-  background: #f5f3ff;
-}
 @media (max-width: 540px) {
   .ia-cta,
   .ia-related {
@@ -20528,4 +20500,11 @@ a.text {
   .vc-article > .vc-faq-q {
     font-size: 16px;
   }
+}
+/* 画像の寸法（2026-10。scripts/seo.py apply が <img> に元の width / height を付ける。診断 P-05）
+   属性は「読み込み前に縦横比どおりの場所を空ける」ためだけに使い、見た目の大きさは今までどおり各クラスの CSS で決める。
+   :where() で詳細度を0にしてあるので、クラスで幅や高さを決めている画像はそちらが勝つ */
+:where(img[width][height]) {
+  width: auto;
+  height: auto;
 }
